@@ -92,3 +92,37 @@ GROUP BY cde.location,cde.continent, cde.date,cva.new_vaccinations
 SELECT *, (RollingPeopleVaccinated / TotalPopulationPerCountry)*100 PercentagePerCountry
 FROM PopvsVac
 
+-- Using Temp Table to perform Calculation on Partition By in previous query
+DROP Table if exists #PercentPopulationVaccinated
+Create Table #PercentPopulationVaccinated
+(
+Continent nvarchar(255),
+Location nvarchar(255),
+Date datetime,
+TotalPopulationPerCountry numeric,
+TotalNewVaccinationsPerCountry numeric,
+RollingPeopleVaccinated numeric
+)
+
+INSERT INTO #PercentPopulationVaccinated
+SELECT cde.continent,cde.location,cde.date, SUM(CONVERT(BIGINT,cde.population)) TotalPopulationPerCountry, SUM(CONVERT(BIGINT, cva.new_vaccinations)) TotalNewVaccinationsPerCountry
+,SUM(CONVERT(int,cva.new_vaccinations)) OVER (Partition by cde.Location Order by cde.location, cde.Date) as RollingPeopleVaccinated
+FROM CovidDeaths cde JOIN CovidVaccinations cva
+ON cde.location = cva.location AND cde.date = cva.date
+--WHERE cde.continent IS NOT NULL
+GROUP BY cde.location,cde.continent, cde.date,cva.new_vaccinations
+
+SELECT *, (RollingPeopleVaccinated / TotalPopulationPerCountry)*100 PercentagePerCountry
+FROM #PercentPopulationVaccinated
+
+-- Creating View to store data for later visualizations
+Create View PercentPopulationVaccinated as
+SELECT cde.continent,cde.location,cde.date, SUM(CONVERT(BIGINT,cde.population)) TotalPopulationPerCountry, SUM(CONVERT(BIGINT, cva.new_vaccinations)) TotalNewVaccinationsPerCountry
+,SUM(CONVERT(int,cva.new_vaccinations)) OVER (Partition by cde.Location Order by cde.location, cde.Date) as RollingPeopleVaccinated
+FROM CovidDeaths cde JOIN CovidVaccinations cva
+ON cde.location = cva.location AND cde.date = cva.date
+WHERE cde.continent IS NOT NULL
+GROUP BY cde.location,cde.continent, cde.date,cva.new_vaccinations
+
+SELECT *
+FROM PercentPopulationVaccinated
